@@ -7,7 +7,7 @@ import dash_bootstrap_components as dbc
 # ==========================
 # 1. LOAD DATA
 # ==========================
-df = pd.read_csv(r"E:\nyc_crashes_dashboard\df_full_features.csv")
+df = pd.read_csv("df_full_features.csv")
 
 # Ensure datetime
 if "CRASH_DATETIME" in df.columns:
