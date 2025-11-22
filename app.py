@@ -1,4 +1,6 @@
+import os
 import re
+
 import pandas as pd
 import plotly.express as px
 from dash import Dash, dcc, html, Input, Output, State
@@ -7,7 +9,12 @@ import dash_bootstrap_components as dbc
 # ==========================
 # 1. LOAD DATA
 # ==========================
-df = pd.read_csv("df_full_features.csv")
+# Use relative path for Railway deployment
+csv_path = "df_full_features.csv"
+if not os.path.exists(csv_path):
+    raise FileNotFoundError(f"CSV file not found: {csv_path}")
+
+df = pd.read_csv(csv_path)
 
 # Ensure datetime
 if "CRASH_DATETIME" in df.columns:
@@ -91,7 +98,7 @@ def parse_search_query(text: str):
 # 3. BUILD APP
 # ==========================
 app = Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
-server = app.server  # for deployment later
+server = app.server  # for deployment (Railway/gunicorn)
 
 app.title = "NYC Crashes Dashboard"
 
@@ -245,6 +252,7 @@ app.layout = dbc.Container(
         State("injury-filter", "value"),
         State("search-input", "value"),
     ],
+    prevent_initial_call=True,  # Don't run on page load
 )
 def update_report(n_clicks, boroughs, years, vehicles, factors, injury_type, search_text):
     # Base dataframe
@@ -367,8 +375,9 @@ def update_report(n_clicks, boroughs, years, vehicles, factors, injury_type, sea
 
     # ---- FIGURE 2: Trend (Year-Month) ----
     if "CRASH_DATETIME" in dff.columns:
-        dff["YEAR_MONTH"] = dff["CRASH_DATETIME"].dt.to_period("M").astype(str)
-        tm_counts = dff["YEAR_MONTH"].value_counts().sort_index().reset_index()
+        temp = dff.copy()
+        temp["YEAR_MONTH"] = temp["CRASH_DATETIME"].dt.to_period("M").astype(str)
+        tm_counts = temp["YEAR_MONTH"].value_counts().sort_index().reset_index()
         tm_counts.columns = ["YEAR_MONTH", "COUNT"]
         fig_trend = px.line(
             tm_counts,
@@ -414,6 +423,10 @@ def update_report(n_clicks, boroughs, years, vehicles, factors, injury_type, sea
 
     # ---- FIGURE 5: Map (Density) ----
     dff_map = dff.dropna(subset=["LATITUDE", "LONGITUDE"])
+    # Sample if too many points (performance optimization)
+    if len(dff_map) > 8000:
+        dff_map = dff_map.sample(n=8000, random_state=42)
+
     if dff_map.empty or "SEVERITY_INDEX" not in dff_map.columns:
         fig_map = px.scatter_mapbox(
             dff_map,
@@ -421,7 +434,7 @@ def update_report(n_clicks, boroughs, years, vehicles, factors, injury_type, sea
             lon="LONGITUDE",
             zoom=9,
             height=500,
-            title="Crash Locations (no severity index)",
+            title="Crash Locations",
             mapbox_style="open-street-map",
         )
     else:
@@ -442,9 +455,8 @@ def update_report(n_clicks, boroughs, years, vehicles, factors, injury_type, sea
 
 
 # ==========================
-# 6. RUN
+# 6. RUN (Railway / local)
 # ==========================
 if __name__ == "__main__":
-    import os
     port = int(os.environ.get("PORT", 8050))
     app.run_server(host="0.0.0.0", port=port, debug=False)
