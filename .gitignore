@@ -1,3 +1,6 @@
 .venv/
 __pycache__/
 *.pyc
+app.ipynb
+df_final_clean.csv
+df_full_clean.csv
