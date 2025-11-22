@@ -445,4 +445,6 @@ def update_report(n_clicks, boroughs, years, vehicles, factors, injury_type, sea
 # 6. RUN
 # ==========================
 if __name__ == "__main__":
-    app.run_server(debug=True)
+    import os
+    port = int(os.environ.get("PORT", 8050))
+    app.run_server(host="0.0.0.0", port=port, debug=False)
